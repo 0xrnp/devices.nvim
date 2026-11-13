@@ -4,9 +4,6 @@ local eq = h.eq
 local fake_android = require("fake_android")
 
 local ROOT = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
--- The launcher runs with a PATH that has no nvim, so it needs a full path. Neovim 0.10 can
--- report v:progpath as just "nvim".
-local NVIM = vim.fn.exepath(vim.v.progpath)
 
 --- A PATH with only what bin/devices itself uses, so no real Xcode or SDK is found. (On a Mac,
 --- /usr/bin has xcrun, and its first run can take long enough to make a test flaky.)
@@ -18,6 +15,20 @@ local function launcher_path()
   return dir
 end
 
+--- Start bin/devices with exactly `environment`, nothing inherited. `env -i` instead of
+--- vim.system's clear_env, which on Neovim 0.10 starts the process with no environment at all.
+---@param environment table<string, string>
+---@param args string[]
+---@param opts table vim.system options
+local function launch(environment, args, opts)
+  local argv = { "/usr/bin/env", "-i" }
+  for key, value in pairs(environment) do
+    argv[#argv + 1] = key .. "=" .. value
+  end
+  argv[#argv + 1] = ROOT .. "/bin/devices"
+  return vim.system(vim.list_extend(argv, args), opts)
+end
+
 --- Run bin/devices with the fake SDK and nothing else on PATH (no Xcode, no real Android SDK).
 local function cli(fake, args)
   local environment = {
@@ -26,12 +37,9 @@ local function cli(fake, args)
     ANDROID_HOME = fake.root .. "/sdk",
     ANDROID_AVD_HOME = fake.root .. "/avd",
     FAKE_STATE = fake.state,
-    DEVICES_NVIM = NVIM,
+    DEVICES_NVIM = vim.v.progpath,
   }
-  local res = vim
-    .system(vim.list_extend({ ROOT .. "/bin/devices" }, args), { env = environment, clear_env = true, text = true })
-    :wait(30000)
-  return res
+  return launch(environment, args, { text = true }):wait(30000)
 end
 
 local T = {}
@@ -100,22 +108,15 @@ end
 T["cli: logs streams to stdout and ends with the stream"] = function()
   local fake = fake_android.new({ adb_devices = { "R5CT1\tdevice model:Pixel_8 transport_id:2" } })
   fake.write("logcat", { "11-13 20:49:46.100  4242  4242 I flutter : hello" })
-  local environment_exit = { "logs", "R5CT1" }
   -- The fake logcat ends at once when told to, so the command finishes.
-  local res = vim
-    .system(vim.list_extend({ ROOT .. "/bin/devices" }, environment_exit), {
-      env = {
-        PATH = launcher_path(),
-        HOME = fake.root,
-        ANDROID_HOME = fake.root .. "/sdk",
-        FAKE_STATE = fake.state,
-        FAKE_LOGCAT_EXIT = "0",
-        DEVICES_NVIM = NVIM,
-      },
-      clear_env = true,
-      text = true,
-    })
-    :wait(30000)
+  local res = launch({
+    PATH = launcher_path(),
+    HOME = fake.root,
+    ANDROID_HOME = fake.root .. "/sdk",
+    FAKE_STATE = fake.state,
+    FAKE_LOGCAT_EXIT = "0",
+    DEVICES_NVIM = vim.v.progpath,
+  }, { "logs", "R5CT1" }, { text = true }):wait(30000)
   eq(res.stdout, "11-13 20:49:46.100  4242  4242 I flutter : hello\n")
   eq(res.code, 1)
   eq(res.stderr:find("log stream ended", 1, true) ~= nil, true)
@@ -125,15 +126,13 @@ T["cli: Ctrl-C in the terminal ends the command and the log stream"] = function(
   local fake = fake_android.new({ adb_devices = { "R5CT1\tdevice model:Pixel_8 transport_id:2" } })
   fake.write("logcat", { "11-13 20:49:46.100  4242  4242 I flutter : hello" })
   local out = {}
-  local proc = vim.system({ ROOT .. "/bin/devices", "logs", "R5CT1" }, {
-    env = {
-      PATH = launcher_path(),
-      HOME = fake.root,
-      ANDROID_HOME = fake.root .. "/sdk",
-      FAKE_STATE = fake.state,
-      DEVICES_NVIM = NVIM,
-    },
-    clear_env = true,
+  local proc = launch({
+    PATH = launcher_path(),
+    HOME = fake.root,
+    ANDROID_HOME = fake.root .. "/sdk",
+    FAKE_STATE = fake.state,
+    DEVICES_NVIM = vim.v.progpath,
+  }, { "logs", "R5CT1" }, {
     -- Its own group stands in for the terminal's foreground group.
     detach = true,
     stdout = function(_, data)
