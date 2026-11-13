@@ -152,7 +152,9 @@ T["cli: Ctrl-C in the terminal ends the command and the log stream"] = function(
   -- What a terminal does on Ctrl-C: SIGINT to every process in the foreground group.
   vim.uv.kill(-proc.pid, "sigint")
   local res = proc:wait(10000)
-  eq(res.code ~= 0, true)
+  -- Neovim 0.12 exits with a code; 0.10 does not handle SIGINT and is killed by it, which
+  -- vim.system reports as code 0 with the signal set. Either way a shell sees an interrupt.
+  eq(res.code ~= 0 or res.signal ~= 0, true)
   local gone = vim.wait(3000, function()
     return vim.uv.kill(logcat, 0) ~= 0
   end, 20)
