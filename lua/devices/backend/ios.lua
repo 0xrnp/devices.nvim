@@ -268,11 +268,15 @@ function M.list(opts, cb)
   add(opts.physical ~= false and (not env or env.devicectl), M.list_physical)
 
   async.all(tasks, function(results)
-    local devices, errors = {}, {}
+    local devices, errors, seen = {}, {}, {}
     for _, result in ipairs(results) do
       vim.list_extend(devices, result.devices)
-      if result.error then
-        errors[#errors + 1] = result.error
+      local failure = result.error
+      -- Without Xcode both lookups fail the same way: say it once.
+      local key = failure and (failure.code .. "\0" .. failure.message .. "\0" .. (failure.hint or ""))
+      if failure and not seen[key] then
+        seen[key] = true
+        errors[#errors + 1] = failure
       end
     end
     cb(Device.dedupe(devices), errors)

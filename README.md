@@ -1,5 +1,7 @@
 # devices.nvim
 
+[![ci](https://github.com/0xrnp/devices.nvim/actions/workflows/ci.yml/badge.svg)](https://github.com/0xrnp/devices.nvim/actions/workflows/ci.yml)
+
 Run and manage iOS simulators, Android emulators and physical devices (USB and Wi-Fi) from
 Neovim, and read their logs, including logs from release builds.
 
@@ -20,6 +22,23 @@ and covered by tests. Physical iPhones need Xcode 15 or newer (`devicectl`). A b
 opens in Simulator.app on Xcode 26 and earlier, and in DeviceHub on Xcode 27. With several
 Xcodes installed, the app comes from the one `xcode-select -p` points to.
 
+## Status
+
+Early release. What has been run, and what has not:
+
+| | Tested |
+| --- | --- |
+| Neovim 0.10.4 and 0.12 | Full test suite, and real simulators and emulators, on macOS |
+| Neovim stable and nightly | Full test suite in CI, on Ubuntu and macOS |
+| iOS simulators | Real Xcode 27.2: list, create, boot, logs, console, erase, delete |
+| Android emulators | Real SDK: list, boot, logcat across app restarts, shutdown |
+| iPhones, Android phones (USB, Wi-Fi), `idevicesyslog` | Fake tools only. No real device has been tried |
+| Linux with a real Android SDK | CI runs the suite with fake tools. Not tried by hand |
+
+If one of the untested paths fails for you, please
+[open an issue](https://github.com/0xrnp/devices.nvim/issues/new/choose) with the output of
+`:checkhealth devices`.
+
 ## Install
 
 With [lazy.nvim](https://github.com/folke/lazy.nvim):
@@ -31,6 +50,9 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
   opts = {},
 }
 ```
+
+Releases are tagged. To stay on the latest release instead of the main branch, add
+`version = "*"`.
 
 To try a local checkout, use `dir` instead:
 
@@ -232,6 +254,10 @@ nvim -l tests/real/ios_smoke.lua       # real Xcode: lists, then uses a throwawa
 nvim -l tests/real/android_smoke.lua   # real SDK: boots an AVD read-only, then shuts it down
 make fmt lint
 ```
+
+Contributions are welcome. Run `make test` and `make fmt` first. The unit tests use fake `xcrun`,
+`simctl`, `adb` and `emulator` scripts, so they run anywhere and never touch a real device. A fix
+for a parsing or tool-output problem should come with a test built from the real output.
 
 ## License
 

@@ -5,18 +5,21 @@ on:
     branches: [main]
   pull_request:
 
+# Actions are pinned to commit hashes. Dependabot proposes updates (see ../dependabot.yml).
 jobs:
   test:
     name: test (${{ matrix.os }}, nvim ${{ matrix.nvim }})
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
         nvim: [v0.10.4, stable, nightly]
     steps:
-      - uses: actions/checkout@v4
-      - uses: rhysd/action-setup-vim@v1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: rhysd/action-setup-vim@febef33995d6649302e9d88dda81e071b68f16a7 # v1
         with:
           neovim: true
           version: ${{ matrix.nvim }}
@@ -24,9 +27,11 @@ jobs:
 
   style:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: JohnnyMorganz/stylua-action@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: JohnnyMorganz/stylua-action@479972f01e665acfcba96ada452c36608bdbbb5e # v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: latest

@@ -1,0 +1,44 @@
+name: Bug report
+description: Something does not work, or works differently from the docs
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: health
+    attributes:
+      label: Output of `:checkhealth devices`
+      description: Run it in Neovim and paste the result. It shows your tools and versions.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: "Output of `nvim --version | head -1`, your OS, and for iOS `xcodebuild -version | head -1`."
+      placeholder: "NVIM v0.11.0, macOS 15.4, Xcode 16.3"
+    validations:
+      required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: Which kind of device
+      multiple: true
+      options:
+        - iOS simulator
+        - iPhone (USB or Wi-Fi)
+        - Android emulator
+        - Android phone (USB)
+        - Android phone (Wi-Fi)
+        - None, or not sure
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Error messages from `:messages`, and logs if it is about the log buffer. Please remove device names and ids you do not want to share.

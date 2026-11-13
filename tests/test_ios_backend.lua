@@ -135,12 +135,11 @@ T["list: Xcode not installed is a tool_missing error with a hint"] = function()
   h.with_env(h.isolated(), function()
     local devices, errors = list()
     eq(devices, {})
-    eq(#errors, 2)
-    for _, e in ipairs(errors) do
-      eq(e.code, "tool_missing")
-      eq(e.guide, "ios")
-      eq(e.hint, "Install Xcode from the App Store.")
-    end
+    -- Simulators and physical devices both need xcrun, but the problem is reported once.
+    eq(#errors, 1)
+    eq(errors[1].code, "tool_missing")
+    eq(errors[1].guide, "ios")
+    eq(errors[1].hint, "Install Xcode from the App Store.")
   end)
 end
 
