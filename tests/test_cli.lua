@@ -4,6 +4,9 @@ local eq = h.eq
 local fake_android = require("fake_android")
 
 local ROOT = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
+-- The launcher runs with a PATH that has no nvim, so it needs a full path. Neovim 0.10 can
+-- report v:progpath as just "nvim".
+local NVIM = vim.fn.exepath(vim.v.progpath)
 
 --- A PATH with only what bin/devices itself uses, so no real Xcode or SDK is found. (On a Mac,
 --- /usr/bin has xcrun, and its first run can take long enough to make a test flaky.)
@@ -23,7 +26,7 @@ local function cli(fake, args)
     ANDROID_HOME = fake.root .. "/sdk",
     ANDROID_AVD_HOME = fake.root .. "/avd",
     FAKE_STATE = fake.state,
-    DEVICES_NVIM = vim.v.progpath,
+    DEVICES_NVIM = NVIM,
   }
   local res = vim
     .system(vim.list_extend({ ROOT .. "/bin/devices" }, args), { env = environment, clear_env = true, text = true })
@@ -107,7 +110,7 @@ T["cli: logs streams to stdout and ends with the stream"] = function()
         ANDROID_HOME = fake.root .. "/sdk",
         FAKE_STATE = fake.state,
         FAKE_LOGCAT_EXIT = "0",
-        DEVICES_NVIM = vim.v.progpath,
+        DEVICES_NVIM = NVIM,
       },
       clear_env = true,
       text = true,
@@ -128,7 +131,7 @@ T["cli: Ctrl-C in the terminal ends the command and the log stream"] = function(
       HOME = fake.root,
       ANDROID_HOME = fake.root .. "/sdk",
       FAKE_STATE = fake.state,
-      DEVICES_NVIM = vim.v.progpath,
+      DEVICES_NVIM = NVIM,
     },
     clear_env = true,
     -- Its own group stands in for the terminal's foreground group.
