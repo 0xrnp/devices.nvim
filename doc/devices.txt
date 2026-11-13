@@ -1,0 +1,186 @@
+*devices.txt*  Simulators, emulators and devices from Neovim
+
+==============================================================================
+CONTENTS                                                    *devices-contents*
+
+  1. Introduction ........................ |devices-intro|
+  2. Commands ............................ |devices-commands|
+  3. Logs ................................ |devices-logs|
+  4. Configuration ....................... |devices-config|
+  5. Lua API ............................. |devices-api|
+  6. Terminal command .................... |devices-cli|
+  7. Troubleshooting ..................... |devices-troubleshooting|
+
+==============================================================================
+1. INTRODUCTION                                                *devices-intro*
+
+devices.nvim lists, starts and manages iOS simulators, Android emulators and
+physical devices (USB and Wi-Fi), and shows their logs in a buffer.
+
+Requirements: Neovim 0.10 or newer, macOS or Linux. iOS needs macOS with
+Xcode. Android needs the Android SDK. Run `:Devices doctor` to see what is
+installed and how to add what is missing.
+
+Xcode: tested on Xcode 27; older `simctl` output (back to Xcode 10) is
+handled. Physical iPhones need Xcode 15 or newer. A booted simulator opens in
+Simulator.app (Xcode 26 and earlier) or DeviceHub (Xcode 27), taken from the
+Xcode that `xcode-select -p` points to.
+
+==============================================================================
+2. COMMANDS                                                 *devices-commands*
+
+                                                                    *:Devices*
+:Devices                Pick a device, then an action for it.
+
+:Devices list           Show every device and its id.
+
+:Devices boot [device] [--cold|--wipe]
+                        Boot a simulator or start an emulator. `--cold`
+                        ignores the emulator's saved state. `--wipe` erases
+                        its data first, after asking. Already running is a
+                        success.
+
+:Devices shutdown [device]
+                        Shut a simulator or emulator down.
+
+:Devices erase [device] Simulator: erase content and settings (it must be
+                        shut down). Emulator: start it with its data wiped.
+                        Asks first.
+
+:Devices delete [device]
+                        Delete a simulator or an emulator. Asks first.
+
+:Devices logs [device] [app={id}] [mode={mode}]
+                        Open a live log. See |devices-logs|.
+
+:Devices copy [device]  Copy the id that `flutter -d`, `adb -s` and `xcrun`
+                        want: a running emulator's adb serial, else the id.
+
+:Devices create         Create a simulator or an emulator, step by step.
+
+:Devices connect        Pair and connect an Android phone over Wi-Fi.
+
+:Devices disconnect [device]
+                        Disconnect an Android phone on Wi-Fi.
+
+:Devices audit [dir]    Look through a project for build settings that remove
+                        logs from release builds. Results go to the quickfix
+                        list.
+
+:Devices doctor         Same as `:checkhealth devices`.
+
+[device] is an id, an adb serial, or a name: exact, any case, or a unique part
+of one. Without it, a picker opens. <Tab> completes subcommands, and device
+names once the devices have been listed in the session.
+
+==============================================================================
+3. LOGS                                                         *devices-logs*
+
+Modes:
+  logcat     Android emulators and phones. With an app (a package name), only
+             that app's lines, followed across restarts, plus system lines
+             that name it, such as crash reports.
+  system     iOS simulators: the system log, with an app (a bundle id) only
+             that app's process, including debug messages. Physical iPhones:
+             the device log through `idevicesyslog` (libimobiledevice).
+  console    iOS: launch the app and show its own output (print, NSLog).
+             This is how a release build's print() output is seen.
+
+Keys in a log buffer:
+  f     filter by text (empty clears it)
+  l     minimum level
+  p     pause or resume (nothing is lost while paused)
+  c     clear
+  r     restart the stream
+  s     save what is shown to a file
+  G     jump to the end and follow new lines
+  q     stop and close
+  g?    show these keys
+
+The buffer follows new lines while the cursor is on the last line.
+
+Logs that a release build removed (R8 `-assumenosideeffects` rules for
+android.util.Log, Babel `transform-remove-console`, a no-op `debugPrint`)
+never reach the device, so no viewer shows them. `:Devices audit` finds these
+settings. iOS `os_log` values show as <private> unless marked
+`privacy: .public`.
+
+==============================================================================
+4. CONFIGURATION                                              *devices-config*
+
+Call `require("devices").setup({...})`, or pass `opts` to your plugin
+manager. Defaults:
+>lua
+  {
+    android = {
+      sdk = nil,           -- ANDROID_HOME, ANDROID_SDK_ROOT, PATH, usual places
+      java_home = nil,     -- JDK for avdmanager
+      avd_home = nil,      -- where AVDs live
+      emulator_args = {},  -- added to every emulator start
+      headless = false,    -- start emulators without a window
+    },
+    ios = { open_simulator_app = true }, -- Simulator.app, or DeviceHub (Xcode 27)
+    logs = { tail = 1000, max_lines = 20000, open = "split" },
+    on_boot = nil,         -- function(device), once a booted device is ready
+    actions = {},          -- { name = "...", run = function(device), when = function(device) }
+  }
+<
+Entries in `actions` appear in each device's action menu.
+
+==============================================================================
+5. LUA API                                                       *devices-api*
+
+Functions that run tools take a callback. None throw for runtime problems.
+`logs` opens the buffer and returns it; `target_id` and `audit` return their
+result directly. Errors are tables with `code`, `message` and often `hint`. Codes: tool_missing,
+timeout, command_failed, parse_failed, unsupported, not_found, invalid_state.
+>lua
+  local devices = require("devices")
+  devices.list(function(list, errors) end)
+  devices.find(query, function(device, err) end)
+  devices.boot(device, { cold = false, wipe = false, wait = false }, function(err) end)
+  devices.shutdown(device, function(err) end)
+  devices.erase(device, function(err) end)
+  devices.delete(device, function(err) end)
+  devices.logs(device, { mode = "logcat", app = "com.example.app" })
+  devices.pick({ filter = function(d) return true end }, function(device) end)
+  devices.target_id(device)
+  devices.audit(dir)
+<
+A device has `id`, `name`, `platform` ("ios" or "android"), `kind`
+("simulator", "emulator" or "physical"), `state`, and optionally
+`os_version`, `serial`, `transport` ("usb", "wifi" or "local") and `detail`.
+
+==============================================================================
+6. TERMINAL COMMAND                                              *devices-cli*
+
+`bin/devices` runs the same code with Neovim as the Lua runtime, without your
+config. Link it onto your PATH:
+>sh
+  ln -s /path/to/devices.nvim/bin/devices ~/.local/bin/devices
+  devices list [--json]
+  devices boot <device> [--cold|--wipe --yes] [--wait]
+  devices shutdown <device>
+  devices erase <device> --yes
+  devices delete <device> --yes
+  devices logs <device> [--app <id>] [--mode logcat|system|console]
+  devices id <device>
+  devices audit [dir]
+  devices doctor
+<
+Exit codes: 0 success, 1 failure, 2 wrong usage.
+
+==============================================================================
+7. TROUBLESHOOTING                                  *devices-troubleshooting*
+
+- No Android devices: set ANDROID_HOME or `android.sdk`.
+- A phone shows "unauthorized": unlock it and accept the USB debugging prompt.
+- Linux, "no permissions": install udev rules for Android devices.
+- Simulators stop when DeviceHub quits (Xcode 27): turn off its "Stop
+  simulators on quit" setting, or use "Quit and Keep Simulators Running".
+- An iPhone shows "disconnected": connect it by cable once, trust this
+  computer, and turn on Developer Mode.
+- Creating an emulator fails about Java: install JDK 17 or newer, or set
+  `android.java_home`.
+
+ vim:tw=78:ts=8:ft=help:norl:

@@ -1,0 +1,17 @@
+#!/bin/sh
+# devices: simulators, emulators and devices from a terminal. Runs devices.nvim's core with
+# Neovim (0.10+) as the Lua runtime, without your Neovim config.
+set -e
+
+# Find the real script when it is reached through a symlink (for example ~/.local/bin/devices).
+self=$0
+while [ -L "$self" ]; do
+  link=$(readlink "$self")
+  case $link in
+    /*) self=$link ;;
+    *) self=$(dirname "$self")/$link ;;
+  esac
+done
+root=$(cd "$(dirname "$self")/.." && pwd -P)
+
+exec "${DEVICES_NVIM:-nvim}" --clean -l "$root/lua/devices/cli.lua" "$@"
