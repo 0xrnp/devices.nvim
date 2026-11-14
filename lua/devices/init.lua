@@ -197,7 +197,18 @@ end
 ---@param cb fun(error: devices.Error?)
 function M.shutdown(device, cb)
   if device.platform == "ios" then
-    return ios.shutdown(device, cb)
+    return ios.shutdown(device, function(failure)
+      if failure or not config.options.ios.quit_simulator_app then
+        return cb(failure)
+      end
+      -- The simulator did shut down, so failing to quit the app is only a warning.
+      ios.quit_simulator_apps(function(quit_error)
+        if quit_error then
+          vim.notify(err.format(quit_error), vim.log.levels.WARN, { title = "devices.nvim" })
+        end
+        cb(nil)
+      end)
+    end)
   end
   android.shutdown(device, config.android(), cb)
 end

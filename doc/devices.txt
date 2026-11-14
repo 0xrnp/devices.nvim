@@ -119,7 +119,10 @@ manager. Defaults:
       emulator_args = {},  -- added to every emulator start
       headless = false,    -- start emulators without a window
     },
-    ios = { open_simulator_app = true }, -- Simulator.app, or DeviceHub (Xcode 27)
+    ios = {
+      open_simulator_app = true, -- Simulator.app, or DeviceHub (Xcode 27)
+      quit_simulator_app = true, -- quit them after a shutdown, once no simulator runs
+    },
     logs = { tail = 1000, max_lines = 20000, open = "split" },
     on_boot = nil,         -- function(device), once a booted device is ready
     actions = {},          -- { name = "...", run = function(device), when = function(device) }

@@ -461,6 +461,58 @@ function M.shutdown(device, cb)
   run_action(device, ACTIONS.shutdown, { "xcrun", "simctl", "shutdown", device.id }, cb)
 end
 
+-- The apps that show simulators, by process name. Both keep a window open for a simulator after
+-- it shuts down.
+local SIMULATOR_APPS = {
+  { process = "Simulator", bundle = SIMULATOR_APP },
+  { process = "DeviceHub", bundle = DEVICEHUB_APP },
+}
+
+--- Quit Simulator.app and DeviceHub once no simulator is running. An app that is not running is
+--- left alone, and so are both while any simulator still runs, because quitting DeviceHub stops
+--- its simulators by default.
+---@param cb fun(error: devices.Error?)
+function M.quit_simulator_apps(cb)
+  local function quit(i)
+    local app = SIMULATOR_APPS[i]
+    if not app then
+      return cb(nil)
+    end
+    process.run({ "pgrep", "-x", app.process }, { timeout = 10000 }, function(found)
+      if found.missing or found.code ~= 0 then
+        return quit(i + 1)
+      end
+      -- Listed again right before quitting: a simulator may have been booted meanwhile.
+      M.list_simulators(nil, function(devices, list_error)
+        if list_error then
+          return cb(list_error)
+        end
+        for _, d in ipairs(devices or {}) do
+          if d.state ~= "shutdown" then
+            return cb(nil)
+          end
+        end
+        local argv = { "osascript", "-e", ('tell application id "%s" to quit'):format(app.bundle) }
+        process.run(argv, { timeout = ACTION_TIMEOUT_MS }, function(res)
+          local failure = err.from_process(res, argv)
+          if failure then
+            failure.message = "The simulator shut down, but "
+              .. app.process
+              .. " could not be quit: "
+              .. failure.message
+            failure.hint = "Allow Neovim's terminal to control "
+              .. app.process
+              .. " in System Settings > Privacy & Security > Automation, or set ios.quit_simulator_app = false."
+            return cb(failure)
+          end
+          quit(i + 1)
+        end)
+      end)
+    end)
+  end
+  quit(1)
+end
+
 --- Erase a simulator's content and settings. It must be shut down.
 ---@param device devices.Device
 ---@param cb fun(error: devices.Error?)

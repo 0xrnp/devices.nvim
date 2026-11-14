@@ -21,6 +21,7 @@ local M = {}
 
 ---@class devices.IosConfig
 ---@field open_simulator_app boolean Bring up Simulator.app (DeviceHub in Xcode 27) when a simulator boots.
+---@field quit_simulator_app boolean Quit Simulator.app and DeviceHub after a shutdown once no simulator runs.
 
 ---@class devices.LogsConfig
 ---@field tail integer Android: earlier lines to show when a log opens.
@@ -38,6 +39,7 @@ M.defaults = {
   },
   ios = {
     open_simulator_app = true,
+    quit_simulator_app = true,
   },
   logs = {
     tail = 1000,
@@ -81,6 +83,7 @@ function M.setup(opts)
   check(merged.android.headless, "android.headless", "boolean")
   check(merged.ios, "ios", "table")
   check(merged.ios.open_simulator_app, "ios.open_simulator_app", "boolean")
+  check(merged.ios.quit_simulator_app, "ios.quit_simulator_app", "boolean")
   check(merged.logs, "logs", "table")
   check(merged.logs.tail, "logs.tail", "number")
   check(merged.logs.max_lines, "logs.max_lines", "number")

@@ -94,12 +94,37 @@ fi
 exit 0
 ]]
 
+-- pgrep -x <process>: finds the apps named in FAKE_RUNNING_APPS.
+local PGREP = [[#!/bin/sh
+PATH="/usr/bin:/bin:$PATH"
+printf '%s\n' "$@" >> "$FAKE_STATE/calls.log"
+echo '--' >> "$FAKE_STATE/calls.log"
+case " $FAKE_RUNNING_APPS " in
+  *" $2 "*) echo 4242; exit 0 ;;
+esac
+exit 1
+]]
+
+-- The message and exit code macOS gives when Automation permission is denied.
+local OSASCRIPT = [[#!/bin/sh
+PATH="/usr/bin:/bin:$PATH"
+printf '%s\n' "$@" >> "$FAKE_STATE/calls.log"
+echo '--' >> "$FAKE_STATE/calls.log"
+if [ -n "$FAKE_OSASCRIPT_DENIED" ]; then
+  echo "execution error: Not authorized to send Apple events to DeviceHub. (-1743)" >&2
+  exit 1
+fi
+exit 0
+]]
+
 ---@param opts? { simctl_json?: string, devicectl_json?: string }
 function M.new(opts)
   opts = opts or {}
   local root = h.tree({
     ["bin/xcrun"] = XCRUN,
     ["bin/open"] = OPEN,
+    ["bin/pgrep"] = PGREP,
+    ["bin/osascript"] = OSASCRIPT,
     -- The selected Xcode's Developer folder, or no Xcode selected.
     ["bin/xcode-select"] = '#!/bin/sh\n[ -n "$FAKE_DEVELOPER_DIR" ] || exit 1\necho "$FAKE_DEVELOPER_DIR"\n',
     ["state/dev/"] = "",

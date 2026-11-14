@@ -548,6 +548,101 @@ T["shutdown: refuses a physical device"] = function()
   end)
 end
 
+-- quitting Simulator and DeviceHub ----------------------------------------------------------
+
+--- A fake whose simctl lists one simulator in `state`.
+local function fake_with_one(state)
+  return fake_xcode.new({
+    simctl_json = vim.json.encode({
+      devices = {
+        ["com.apple.CoreSimulator.SimRuntime.iOS-18-2"] = {
+          { udid = "S1", name = "Test Sim", state = state, isAvailable = true },
+        },
+      },
+    }),
+  })
+end
+
+--- The scripts osascript was asked to run.
+local function quit_scripts(fake)
+  return vim.tbl_map(function(call)
+    return call[2]
+  end, calls_of(fake, "-e"))
+end
+
+T["quit apps: quits the apps that run once no simulator does"] = function()
+  local fake = fake_with_one("Shutdown")
+  h.with_env(fake.env({ FAKE_RUNNING_APPS = "DeviceHub" }), function()
+    eq(act(ios.quit_simulator_apps), nil)
+    eq(quit_scripts(fake), { 'tell application id "com.apple.dt.Devices" to quit' })
+  end)
+end
+
+T["quit apps: leaves them while a simulator still runs"] = function()
+  local fake = fake_with_one("Booted")
+  h.with_env(fake.env({ FAKE_RUNNING_APPS = "Simulator DeviceHub" }), function()
+    eq(act(ios.quit_simulator_apps), nil)
+    eq(quit_scripts(fake), {})
+  end)
+end
+
+T["quit apps: does nothing when no app runs"] = function()
+  local fake = fake_with_one("Shutdown")
+  h.with_env(fake.env(), function()
+    eq(act(ios.quit_simulator_apps), nil)
+    eq(quit_scripts(fake), {})
+    eq(#calls_of(fake, "simctl"), 0)
+  end)
+end
+
+T["quit apps: explains a denied Automation permission"] = function()
+  local fake = fake_with_one("Shutdown")
+  h.with_env(fake.env({ FAKE_RUNNING_APPS = "DeviceHub", FAKE_OSASCRIPT_DENIED = "1" }), function()
+    local e = act(ios.quit_simulator_apps)
+    eq(e.code, "command_failed")
+    eq(e.message:find("DeviceHub could not be quit", 1, true) ~= nil, true)
+    eq(e.hint:find("ios.quit_simulator_app = false", 1, true) ~= nil, true)
+  end)
+end
+
+T["shutdown through the plugin quits the apps unless turned off, and only warns on failure"] = function()
+  local devices = require("devices")
+  local config = require("devices.config")
+  local notified = {}
+  local notify = vim.notify
+  vim.notify = function(message, level)
+    notified[#notified + 1] = { message = message, level = level }
+  end
+  local ok, problem = pcall(function()
+    local fake = fake_with_one("Shutdown")
+    fake.set_state("S1", "Booted")
+    h.with_env(fake.env({ FAKE_RUNNING_APPS = "DeviceHub", FAKE_OSASCRIPT_DENIED = "1" }), function()
+      config.setup({})
+      eq(
+        act(function(cb)
+          devices.shutdown(simulator("S1"), cb)
+        end),
+        nil
+      )
+      eq(#quit_scripts(fake), 1)
+      eq(#notified, 1)
+      eq(notified[1].level, vim.log.levels.WARN)
+
+      fake.set_state("S1", "Booted")
+      config.setup({ ios = { quit_simulator_app = false } })
+      act(function(cb)
+        devices.shutdown(simulator("S1"), cb)
+      end)
+      eq(#quit_scripts(fake), 1)
+    end)
+  end)
+  vim.notify = notify
+  config.setup({})
+  if not ok then
+    error(problem, 0)
+  end
+end
+
 -- erase -------------------------------------------------------------------------------------
 
 T["erase: erases a shut down simulator"] = function()

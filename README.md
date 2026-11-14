@@ -156,6 +156,7 @@ require("devices").setup({
   },
   ios = {
     open_simulator_app = true, -- open Simulator.app (DeviceHub in Xcode 27) when one boots
+    quit_simulator_app = true, -- quit them after a shutdown, once no simulator runs
   },
   logs = {
     tail = 1000,          -- Android: earlier lines to show first
