@@ -149,13 +149,21 @@ T["cli: Ctrl-C in the terminal ends the command and the log stream"] = function(
   )
   local logcat = tonumber(fake.read("logcat.pid")[1] or "")
   assert(logcat, "the fake logcat did not start")
+  -- The fake prints before it execs sleep. Interrupting in between would test the shell, not the CLI.
+  assert(
+    vim.wait(5000, function()
+      local ps = vim.system({ "ps", "-o", "comm=", "-p", tostring(logcat) }):wait()
+      return vim.trim(ps.stdout or ""):match("sleep$") ~= nil
+    end, 50),
+    "the fake logcat never reached sleep"
+  )
   -- What a terminal does on Ctrl-C: SIGINT to every process in the foreground group.
   vim.uv.kill(-proc.pid, "sigint")
   local res = proc:wait(10000)
   -- Neovim 0.12 exits with a code; 0.10 does not handle SIGINT and is killed by it, which
   -- vim.system reports as code 0 with the signal set. Either way a shell sees an interrupt.
   eq(res.code ~= 0 or res.signal ~= 0, true)
-  local gone = vim.wait(3000, function()
+  local gone = vim.wait(5000, function()
     return vim.uv.kill(logcat, 0) ~= 0
   end, 20)
   if not gone then
